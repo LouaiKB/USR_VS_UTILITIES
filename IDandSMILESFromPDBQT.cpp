@@ -16,6 +16,7 @@
 using namespace std;
 using namespace boost::filesystem;
 using boost_ofstream = boost::filesystem::ofstream;
+using boost_ifstream = boost::filesystem::ifstream;
 
 int main(int argc, char* argv[])
 {
@@ -51,7 +52,7 @@ int main(int argc, char* argv[])
         if (entry.path().extension() == pdbqt_extension)
         {
             cout << "Porcessing molecule Number° " << counter << endl;
-            boost::filesystem::ifstream ifs(entry.path());
+            boost_ifstream ifs(entry.path());
             while (getline(ifs, line))
             {
                 if (line.find("Compound:") != string::npos)

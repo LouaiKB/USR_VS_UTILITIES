@@ -10,6 +10,7 @@
  */
 
 #include <iostream>
+#include <string>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 

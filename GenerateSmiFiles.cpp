@@ -18,6 +18,13 @@ using namespace boost::filesystem;
 using boost_ofstream = boost::filesystem::ofstream;
 using boost_ifstream = boost::filesystem::ifstream;
 
+// function to remove whitespaces
+inline auto stripWhiteSpaces(string& str)
+{
+    str.erase(remove(str.begin(), str.end(), ' '), str.end());
+}
+
+
 int main(int argc, char* argv[])
 {
     if (argc != 3)
@@ -32,11 +39,6 @@ int main(int argc, char* argv[])
 
     // ofstream instances
     boost_ofstream smilesfile(smi_file, ios::app);
-
-    // lambda function to remove whitespaces
-    auto stripWhiteSpaces = [](string& str) {
-        str.erase(remove(str.begin(), str.end(), ' '), str.end());
-    };
 
     // constants
     const string pdbqt_extension = ".pdbqt";

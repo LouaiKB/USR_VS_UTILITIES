@@ -9,6 +9,9 @@
  */
 
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <chrono>
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
@@ -16,10 +19,9 @@
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <fstream>
-#include <string>
 
 using namespace std;
+using namespace std::chrono;
 using namespace RDKit;
 using namespace RDKit::MolOps;
 using namespace RDKit::DGeomHelpers;
@@ -27,6 +29,11 @@ using namespace boost::filesystem;
 using boost_ifstream = boost::filesystem::ifstream;
 using boost_ofstream = boost::filesystem::ofstream;
 
+// function to remove whitespaces
+inline auto stripWhiteSpaces(string& str)
+{
+  str.erase(remove(str.begin(), str.end(), ' '), str.end());
+}
 
 int main(int argc, char* argv[])
 {
@@ -40,11 +47,6 @@ int main(int argc, char* argv[])
   const auto pdbqt_folder = argv[1];
   const auto conformers_file = argv[2];
 
-  // lambda function to remove whitespaces
-  auto stripWhiteSpaces = [](string& str) {
-      str.erase(remove(str.begin(), str.end(), ' '), str.end());
-  };
-
   // Inialize the output file of conformers
   boost_ofstream conf_file(conformers_file, ios::app);
 
@@ -52,7 +54,7 @@ int main(int argc, char* argv[])
   const string pdbqt_extension = ".pdbqt";
   
   // Initialize variables
-  string line, compound, smiles;
+  string line, compound, smiles, next_line;
   int pos;
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
@@ -77,15 +79,28 @@ int main(int argc, char* argv[])
         }
         if (line.find("SMILES:") != string::npos)
         {
+          /**
+           * @brief Some compounds of the REAL library strangely contain a 'q' and 'r' characters in their 
+           * SMILES, and other compounds have a splitted SMILES in two lines. These problems cause a Segfault error raised from the RDKit API.
+           * Here is a check of the goodness of the SMILES molecule, to avoid the Segfault error
+           */
           pos = line.find(':');
           smiles = line.substr(pos + 1);
           stripWhiteSpaces(smiles);
-          /**
-           * @brief Some compounds of the REAL library strangely contain a 'q' character in their 
-           * SMILES, which causes a Segfault error raised from the RDKit API.
-           * Here is a check of the goodness of the SMILES molecule, to avoid the Segfault error
-           */
-          if (smiles.find('q') != string::npos)
+          if (getline(ifs, next_line))
+          {
+            if (next_line.find("REMARK") != string::npos)
+            {
+              cout << "No problem with the SMILES!" << endl;
+            }
+            else
+            {
+              cerr << "The SMILES is splited, trying to fix the SMILES" << endl;
+              smiles = smiles + next_line;
+              cout << "The fixed SMILES: " << smiles << endl;
+            }
+          }
+          if (smiles.find('q') != string::npos || smiles.find('r') != string::npos)
           {
             cerr << "Incorrect format of the SMILES" << endl;
             break;

@@ -131,7 +131,7 @@ int main(int argc, char* argv[])
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
               // to optimize performance, only conformers that are generated in less than 2500 ms are kept
-              future<INT_VECT> future_conformers = async(launch::deferred, EmbedConformers, ref(mol), ref(params));
+              future<INT_VECT> future_conformers = async(launch::deferred, EmbedConformers, ref(mol), ref(params)); // launch::deferred for not creating a new thread
               auto status = future_conformers.wait_for(milliseconds(2500));
               if (status == future_status::timeout)
               {

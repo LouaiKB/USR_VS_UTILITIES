@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
           cout << "The SMILES IS : " << smiles << endl;
         }
       }
-      if (smiles.find('q') != string::npos)
+      if (smiles.find('q') != string::npos || smiles.find('r') != string::npos)
       {
         cerr << "Incorrect format of the SMILES" << endl;
         break;

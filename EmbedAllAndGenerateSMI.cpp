@@ -12,6 +12,7 @@
 #include <fstream>
 #include <string>
 #include <chrono>
+#include <future>
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
@@ -33,6 +34,12 @@ using boost_ofstream = boost::filesystem::ofstream;
 inline auto stripWhiteSpaces(string& str)
 {
   str.erase(remove(str.begin(), str.end(), ' '), str.end());
+}
+
+// Inline function to generate conformers
+inline auto EmbedConformers(ROMol& mol, EmbedParameters& params)
+{
+  return EmbedMultipleConfs(mol, 4, params);
 }
 
 int main(int argc, char* argv[])
@@ -123,7 +130,15 @@ int main(int argc, char* argv[])
               const unique_ptr<ROMol> mol_ptr(addHs(*smi_ptr));
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
-              const auto confIds = EmbedMultipleConfs(mol, 4, params);
+              // to optimize performance, only conformers that are generated in less than 2500 ms are kept
+              future<INT_VECT> future_conformers = async(launch::deferred, EmbedConformers, ref(mol), ref(params));
+              auto status = future_conformers.wait_for(milliseconds(2500));
+              if (status == future_status::timeout)
+              {
+                cerr << "Conformers take too long to be generated" << endl;
+                break;
+              }
+              const auto confIds = future_conformers.get();
               if (confIds.empty())
               {
                 cerr << "Error, in parsing molecule. Conformers not generated!" << endl;
@@ -132,7 +147,7 @@ int main(int argc, char* argv[])
               cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
               smilesfile << smiles << '\n';
               smifile << compound << '\t' << smiles << '\n';
-              // Writing conformers
+              // Writing conformers in the output SDF
               for (const auto confId : confIds)
               {
                 writer.write(mol, confId);

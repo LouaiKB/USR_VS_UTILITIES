@@ -45,8 +45,8 @@ private:
   ROMol m_Mol;
   INT_VECT m_ConfIds;
   const EmbedParameters m_Params;
-  future<INT_VECT> m_Future;
-  future_status m_Future_status;
+  condition_variable _cv;
+  mutex _mu;
 };
 
 Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) {}
@@ -59,14 +59,17 @@ inline INT_VECT Thread_job::embedMolecules()
 
 inline void Thread_job::run(SDWriter& sdf_writer)
 {
-  m_Future = async(launch::async, bind(&Thread_job::embedMolecules, this));
-  m_Future_status = m_Future.wait_for(1s);
-  if (m_Future_status == future_status::timeout)
+
+  thread thread_job([this]() {
+    m_ConfIds = embedMolecules();
+    _cv.notify_one();
+  });
+  thread_job.detach();
   {
-    cerr << "Time out error!" << endl;
-    return;
+    unique_lock<mutex> l(_mu);
+    if (_cv.wait_for(l, 1.5s) == cv_status::timeout)
+      throw runtime_error("Timeout");
   }
-  m_ConfIds = m_Future.get();
   if (m_ConfIds.size() != 4)
   {
     m_ConfIds.clear();
@@ -181,15 +184,23 @@ int main(int argc, char* argv[])
           mol.setProp("_Name", compound);
           {
             Thread_job thread(mol, params);
-            thread.run(writer);
-            if (thread.conformersGenerated())
+            try
             {
-              cout << "Error conformers not generated" << endl;
-              break;
-            } 
-            else
+              thread.run(writer);
+              if (thread.conformersGenerated())
+              {
+                cout << "Error conformers not generated" << endl;
+                break;
+              } 
+              else
+              {
+                cout << thread.getNumConformers() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
+                break;
+              }
+            }
+            catch(const std::runtime_error& e)
             {
-              cout << thread.getNumConformers() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
+              std::cerr << e.what() << '\n';
               break;
             }
           }

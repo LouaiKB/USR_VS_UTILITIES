@@ -163,7 +163,6 @@ int main(int argc, char* argv[])
             pos = line.find(':');
             compound = line.substr(pos + 1);
             stripWhiteSpaces(compound);
-            id_file << compound << '\n';
         }
         if (line.find("SMILES:") != string::npos)
         {
@@ -214,6 +213,9 @@ int main(int argc, char* argv[])
                   else
                   {
                     cout << thread.getNumConformers() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
+                    smilesfile << smiles << '\n';
+                    id_file << compound << '\n';
+                    smifile << compound << '\t' << smiles << '\n';
                     counter++;
                     break;
                   }

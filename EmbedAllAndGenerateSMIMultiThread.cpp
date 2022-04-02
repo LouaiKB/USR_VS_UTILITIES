@@ -42,7 +42,7 @@ public:
   const inline int getNumConformers() const;
 
 private:
-  const unsigned int m_NumConfs = 4;
+  const unsigned int m_NumConfs;
   ROMol m_Mol;
   INT_VECT m_ConfIds;
   const EmbedParameters m_Params;
@@ -50,7 +50,10 @@ private:
   mutex _mu;
 };
 
-Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) {}
+Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) 
+{
+  m_NumConfs = 4;
+}
 Thread_job::~Thread_job() {}
 
 inline INT_VECT Thread_job::embedMolecules()

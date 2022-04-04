@@ -42,7 +42,7 @@ public:
   const inline int getNumConformers() const;
 
 private:
-  const unsigned int m_NumConfs;
+  const unsigned int m_NumConfs = 4;
   ROMol m_Mol;
   INT_VECT m_ConfIds;
   const EmbedParameters m_Params;
@@ -50,10 +50,8 @@ private:
   mutex _mu;
 };
 
-Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) 
-{
-  m_NumConfs = 4;
-}
+Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) {}
+
 Thread_job::~Thread_job() {}
 
 inline INT_VECT Thread_job::embedMolecules()
@@ -108,10 +106,10 @@ inline auto stripWhiteSpaces(string& str)
 }
 
 // Inline function to generate conformers
-// inline auto EmbedConformers(ROMol& mol, EmbedParameters& params)
-// {
-//   return EmbedMultipleConfs(mol, 4, params);
-// }
+inline auto EmbedConformers(ROMol& mol, EmbedParameters& params)
+{
+  return EmbedMultipleConfs(mol, 4, params);
+}
 
 int main(int argc, char* argv[])
 {
@@ -146,6 +144,9 @@ int main(int argc, char* argv[])
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
+  INT_VECT confIds;
+  condition_variable cv;
+  mutex mu;
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder
@@ -201,35 +202,43 @@ int main(int argc, char* argv[])
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
               {
-                Thread_job thread(mol, params);
-                try
+                thread t([&]() {
+                  mu.lock();
+                  confIds = EmbedMultipleConfs(mol, 4, params);
+                  mu.unlock();
+                  cv.notify_all();
+                });
+                t.detach();
                 {
-                  thread.run(writer);
-                  if (thread.conformersGenerated())
+                  unique_lock<mutex> lock(mu);
+                  if (cv.wait_for(lock, 1.5s) == cv_status::timeout)
                   {
-                    cout << "Error conformers not generated" << endl;
-                    break;
-                  } 
-                  else
-                  {
-                    cout << thread.getNumConformers() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
-                    smilesfile << smiles << '\n';
-                    id_file << compound << '\n';
-                    smifile << compound << '\t' << smiles << '\n';
-                    counter++;
+                    cerr << "Time out" << endl;
                     break;
                   }
                 }
-                catch(const std::runtime_error& e)
+                if (confIds.size() != 4)
                 {
-                  std::cerr << e.what() << '\n';
+                  cerr << "Molecule does not have 4 conformers" << endl;
                   break;
+                }
+                else
+                {
+                  cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
+                  id_file << compound << '\n';
+                  smilesfile << smiles << '\n';
+                  smifile << compound << '\t' << smiles << '\n';
+                  for (const auto confId : confIds)
+                  {
+                    writer.write(mol, confId);
+                  }
+                  counter++;
                 }
               }
             }
             catch (const MolSanitizeException& e)
             {
-              cerr << "Kekulization problem!" << endl;
+              cerr << e.what() << endl;
               break;
             }
           }

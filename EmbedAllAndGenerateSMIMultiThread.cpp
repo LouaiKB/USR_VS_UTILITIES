@@ -19,6 +19,9 @@
 #include <GraphMol/FragCatalog/FragFPGenerator.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <boost/filesystem/fstream.hpp>
+#include <mutex>
+#include <thread>
+#include <condition_variable>
 #include <boost/filesystem/operations.hpp>
 
 using namespace std;
@@ -129,20 +132,20 @@ int main(int argc, char* argv[])
               mol.setProp("_Name", compound);
               {
                 thread t([&]() {
-                  mu.lock();
+                  lock_guard<mutex> guard(mu);
                   confIds = EmbedMultipleConfs(mol, 4, params);
-                  mu.unlock();
-                  cv.notify_all();
+                  cv.notify_one();
                 });
-                t.detach();
                 {
                   unique_lock<mutex> lock(mu);
-                  if (cv.wait_for(lock, 1.5s) == cv_status::timeout)
+                  if (cv.wait_for(lock, 0.3s) == cv_status::timeout)
                   {
+                    t.detach();
                     cerr << "Time out" << endl;
                     break;
                   }
                 }
+                t.join();
                 if (confIds.size() != 4)
                 {
                   cerr << "Molecule does not have 4 conformers" << endl;
@@ -159,6 +162,7 @@ int main(int argc, char* argv[])
                     writer.write(mol, confId);
                   }
                   counter++;
+                  break;
                 }
               }
             }

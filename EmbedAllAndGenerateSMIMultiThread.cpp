@@ -30,86 +30,12 @@ using namespace boost::filesystem;
 using boost_ifstream = boost::filesystem::ifstream;
 using boost_ofstream = boost::filesystem::ofstream;
 
-class Thread_job
-{
-public:
-  explicit Thread_job(ROMol, EmbedParameters&);
-  ~Thread_job();
-  inline void run(SDWriter&);
-  inline INT_VECT embedMolecules();
-  const inline ROMol& getMolecule() const;
-  inline bool conformersGenerated();
-  const inline int getNumConformers() const;
-
-private:
-  const unsigned int m_NumConfs = 4;
-  ROMol m_Mol;
-  INT_VECT m_ConfIds;
-  const EmbedParameters m_Params;
-  condition_variable _cv;
-  mutex _mu;
-};
-
-Thread_job::Thread_job(ROMol mol, EmbedParameters& params) : m_Mol(mol), m_Params(params) {}
-
-Thread_job::~Thread_job() {}
-
-inline INT_VECT Thread_job::embedMolecules()
-{
-  return EmbedMultipleConfs(m_Mol, m_NumConfs, m_Params);
-}
-
-inline void Thread_job::run(SDWriter& sdf_writer)
-{
-
-  thread thread_job([this]() {
-    m_ConfIds = embedMolecules();
-    _cv.notify_one();
-  });
-  thread_job.detach();
-  {
-    unique_lock<mutex> l(_mu);
-    if (_cv.wait_for(l, 1.5s) == cv_status::timeout)
-      throw runtime_error("Timeout");
-  }
-  if (m_ConfIds.size() != 4)
-  {
-    m_ConfIds.clear();
-    return;
-  }
-  // writing in the sdf file
-  for (const auto confId : m_ConfIds)
-  {
-    sdf_writer.write(m_Mol, confId);
-  }
-}
-
-const inline ROMol& Thread_job::getMolecule() const
-{
-  return m_Mol;
-}
-
-inline bool Thread_job::conformersGenerated()
-{
-  return m_ConfIds.empty();
-}
-
-const inline int Thread_job::getNumConformers() const
-{
-  return m_ConfIds.size();
-}
-
 // function to remove whitespaces
 inline auto stripWhiteSpaces(string& str)
 {
   str.erase(remove(str.begin(), str.end(), ' '), str.end());
 }
 
-// Inline function to generate conformers
-inline auto EmbedConformers(ROMol& mol, EmbedParameters& params)
-{
-  return EmbedMultipleConfs(mol, 4, params);
-}
 
 int main(int argc, char* argv[])
 {

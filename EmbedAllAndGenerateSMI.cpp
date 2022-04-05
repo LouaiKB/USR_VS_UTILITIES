@@ -129,18 +129,8 @@ int main(int argc, char* argv[])
               const unique_ptr<ROMol> smi_ptr(SmilesToMol(smiles));
               const unique_ptr<ROMol> mol_ptr(addHs(*smi_ptr));
               auto& mol = *mol_ptr;
+              auto raw_mol = mol;
               mol.setProp("_Name", compound);
-              // generate 4 chemical properties for the molecules
-              realprop4 << calcExactMW(mol) << '\t'
-                        << calcClogP(mol) << '\t'
-                        << calcTPSA(mol) << '\t'
-                        << calcLabuteASA(mol) << '\n';
-              // generate 5 chemical properties for the molecules
-              realprop5 << mol.getNumHeavyAtoms() << '\t'
-                        << calcNumHBD(mol) << '\t'
-                        << calcNumHBA(mol) << '\t'
-                        << calcNumRotatableBonds(mol) << '\t'
-                        << calcNumRings(mol) << '\n';
               // generate conformers
               const auto confIds = EmbedMultipleConfs(mol, 4, params);
               if (confIds.empty())
@@ -151,6 +141,17 @@ int main(int argc, char* argv[])
               // Check if the molecule has 4 conformers
               if (confIds.size() == 4)
               {
+                // generate 4 chemical properties for the molecules
+                realprop4 << calcExactMW(raw_mol) << '\t'
+                          << calcClogP(raw_mol) << '\t'
+                          << calcTPSA(raw_mol) << '\t'
+                          << calcLabuteASA(raw_mol) << '\n';
+                // generate 5 chemical properties for the molecules
+                realprop5 << raw_mol.getNumHeavyAtoms() << '\t'
+                          << calcNumHBD(raw_mol) << '\t'
+                          << calcNumHBA(raw_mol) << '\t'
+                          << calcNumRotatableBonds(raw_mol) << '\t'
+                          << calcNumRings(raw_mol) << '\n';
                 cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
                 id_file << compound << '\n';
                 smilesfile << smiles << '\n';

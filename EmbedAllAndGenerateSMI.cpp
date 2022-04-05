@@ -16,8 +16,8 @@
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
-#include <GraphMol/FragCatalog/FragFPGenerator.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
+#include <GraphMol/Descriptors/MolDescriptors.h>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 
@@ -26,6 +26,7 @@ using namespace std::chrono;
 using namespace RDKit;
 using namespace RDKit::MolOps;
 using namespace RDKit::DGeomHelpers;
+using namespace RDKit::Descriptors;
 using namespace boost::filesystem;
 using boost_ifstream = boost::filesystem::ifstream;
 using boost_ofstream = boost::filesystem::ofstream;
@@ -34,12 +35,6 @@ using boost_ofstream = boost::filesystem::ofstream;
 inline auto stripWhiteSpaces(string& str)
 {
   str.erase(remove(str.begin(), str.end(), ' '), str.end());
-}
-
-// Inline function to generate conformers
-inline auto EmbedConformers(ROMol& mol, EmbedParameters& params)
-{
-  return EmbedMultipleConfs(mol, 4, params);
 }
 
 int main(int argc, char* argv[])
@@ -55,16 +50,21 @@ int main(int argc, char* argv[])
   const auto conformers_file = argv[2];
   const auto smi_file = argv[3];
 
-  // generate smiles.txt and realid.txt
+  // generate smiles.txt and realid.txt and properties
   int p = string(smi_file).find('.');
   path only_smiles_txt = string(smi_file).substr(0, p) + "_only_smiles.txt";
   path only_id_txt = string(smi_file).substr(0, p) + "_only_id.txt";
+  p = string(conformers_file).find('.');
+  path prop4_txt = string(conformers_file).substr(0, p) + "_4properties.txt";
+  path prop5_txt = string(conformers_file).substr(0, p) + "_5properties.txt";
 
-  // Inialize the output file of conformers
+  // Inialize the output files
   boost_ofstream conf_file(conformers_file, ios::app);
   boost_ofstream smifile(smi_file, ios::app);
   boost_ofstream smilesfile(only_smiles_txt, ios::app);
   boost_ofstream id_file(only_id_txt, ios::app);
+  boost_ofstream realprop4(prop4_txt, ios::app);
+  boost_ofstream realprop5(prop5_txt, ios::app);
 
   // Initalize constants
   const string pdbqt_extension = ".pdbqt";
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
-  params.numThreads = 8;
+  params.numThreads = thread::hardware_concurrency() - 10;
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder
@@ -130,6 +130,18 @@ int main(int argc, char* argv[])
               const unique_ptr<ROMol> mol_ptr(addHs(*smi_ptr));
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
+              // generate 4 chemical properties for the molecules
+              realprop4 << calcExactMW(mol) << '\t'
+                        << calcClogP(mol) << '\t'
+                        << calcTPSA(mol) << '\t'
+                        << calcLabuteASA(mol) << '\n';
+              // generate 5 chemical properties for the molecules
+              realprop5 << mol.getNumHeavyAtoms() << '\t'
+                        << calcNumHBD(mol) << '\t'
+                        << calcNumHBA(mol) << '\t'
+                        << calcNumRotatableBonds(mol) << '\t'
+                        << calcNumRings(mol) << '\n';
+              // generate conformers
               const auto confIds = EmbedMultipleConfs(mol, 4, params);
               if (confIds.empty())
               {

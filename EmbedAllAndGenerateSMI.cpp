@@ -75,6 +75,7 @@ int main(int argc, char* argv[])
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
+  params.numThreads = 8;
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder
@@ -92,7 +93,6 @@ int main(int argc, char* argv[])
             pos = line.find(':');
             compound = line.substr(pos + 1);
             stripWhiteSpaces(compound);
-            id_file << compound << '\n';
         }
         if (line.find("SMILES:") != string::npos)
         {
@@ -130,30 +130,32 @@ int main(int argc, char* argv[])
               const unique_ptr<ROMol> mol_ptr(addHs(*smi_ptr));
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
-              // to optimize performance, only conformers that are generated in less than 2500 ms are kept
-              future<INT_VECT> future_conformers = async(launch::deferred, EmbedConformers, ref(mol), ref(params)); // launch::deferred for not creating a new thread
-              auto status = future_conformers.wait_for(milliseconds(2500));
-              if (status == future_status::timeout)
-              {
-                cerr << "Conformers take too long to be generated" << endl;
-                break;
-              }
-              const auto confIds = future_conformers.get();
+              const auto confIds = EmbedMultipleConfs(mol, 4, params);
               if (confIds.empty())
               {
                 cerr << "Error, in parsing molecule. Conformers not generated!" << endl;
                 break;
               }
-              cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
-              smilesfile << smiles << '\n';
-              smifile << compound << '\t' << smiles << '\n';
-              // Writing conformers in the output SDF
-              for (const auto confId : confIds)
+              // Check if the molecule has 4 conformers
+              if (confIds.size() == 4)
               {
-                writer.write(mol, confId);
+                cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
+                id_file << compound << '\n';
+                smilesfile << smiles << '\n';
+                smifile << compound << '\t' << smiles << '\n';
+                // Writing conformers in the output SDF
+                for (const auto confId : confIds)
+                {
+                  writer.write(mol, confId);
+                }
+                counter++;
+                break;
               }
-              counter++;
-              break;
+              else
+              {
+                cout << "Molecule doesn't have 4 conformers!" << endl;
+                break;
+              }
             }
             catch (const MolSanitizeException& e)
             {

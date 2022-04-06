@@ -1,7 +1,8 @@
 /**
  * @file EmbedPDBQTMols.cpp
  * @author Louai KASSA BAGHDOUCHE
- * @brief A C++ code to generate conformers from multiple pdbqt files, by fetching the SMILES and ID from PDBQT and generate SMI files
+ * @brief A C++ code to generate conformers and their USRCAT Features from multiple pdbqt files, by fetching the SMILES and ID 
+ * from PDBQT and generate SMI files
  * @date 2022-03-29
  * 
  * @copyright Copyright (c) 2022
@@ -9,10 +10,9 @@
  */
 
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <chrono>
-#include <future>
+#include <array>
+#include <vector>
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
@@ -262,9 +262,9 @@ int main(int argc, char* argv[])
       {
         if (line.find("Compound:") != string::npos)
         {
-            pos = line.find(':');
-            compound = line.substr(pos + 1);
-            stripWhiteSpaces(compound);
+          pos = line.find(':');
+          compound = line.substr(pos + 1);
+          stripWhiteSpaces(compound);
         }
         if (line.find("SMILES:") != string::npos)
         {

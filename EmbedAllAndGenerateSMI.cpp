@@ -247,7 +247,8 @@ int main(int argc, char* argv[])
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
-  params.numThreads = 8;
+  params.numThreads = 10;
+  params.maxIterations = 6;
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder

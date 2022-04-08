@@ -33,9 +33,9 @@ using namespace boost::filesystem;
 using boost_ifstream = boost::filesystem::ifstream;
 using boost_ofstream = boost::filesystem::ofstream;
 
-static const size_t num_references = 4;
-static const size_t num_subsets = 5;
-static const array<string, num_subsets> SubsetSMARTS
+static const size_t s_Num_references = 4;
+static const size_t s_Num_subsets = 5;
+static const array<string, s_Num_subsets> s_SubsetSMARTS
 {{
   "[!#1]", // heavy
   "[#6+0!$(*~[#7,#8,F]),SH0+0v2,s+0,S^3,Cl+0,Br+0,I+0]", // hydrophobic
@@ -44,10 +44,10 @@ static const array<string, num_subsets> SubsetSMARTS
   "[N!H0v3,N!H0+v4,OH+0,SH+0,nH+0]", // donor
 }};
 
-static array<unique_ptr<ROMol>, num_subsets> SubsetMols;
-static array<vector<int>, num_subsets> subsets;
-static array<Point3D, num_references> references;
-static array<vector<float>, num_references> dista;
+static array<unique_ptr<ROMol>, s_Num_subsets> SubsetMols;
+static array<vector<int>, s_Num_subsets> subsets;
+static array<Point3D, s_Num_references> references;
+static array<vector<float>, s_Num_references> dista;
 
 // Compute the Euclidien distance
 template<typename T>
@@ -63,13 +63,13 @@ static array<float, 60> usrcat_features(ROMol& mol, int index)
 {
   array<float, 60> features;
   // Wrap SMARTS strings to ROMol objects.
-  for (size_t k = 0; k < num_subsets; ++k)
+  for (size_t k = 0; k < s_Num_subsets; ++k)
   {
-    SubsetMols[k].reset(reinterpret_cast<ROMol*>(SmartsToMol(SubsetSMARTS[k])));
+    SubsetMols[k].reset(reinterpret_cast<ROMol*>(SmartsToMol(s_SubsetSMARTS[k])));
   }
   const auto num_points = mol.getNumHeavyAtoms();
   const auto& conformer = mol.getConformer(index);
-  for (size_t k = 0; k < num_subsets; ++k)
+  for (size_t k = 0; k < s_Num_subsets; ++k)
   {
     vector<vector<pair<int, int>>> matchVect;
     SubstructMatch(mol, *SubsetMols[k], matchVect);
@@ -127,7 +127,7 @@ static array<float, 60> usrcat_features(ROMol& mol, int index)
     }
   }
   // Precalculate the distances of heavy atoms to the reference points, given that subsets[1 to 4] are subsets of subsets[0].
-  for (size_t ref = 0; ref < num_references; ++ref)
+  for (size_t ref = 0; ref < s_Num_references; ++ref)
   {
     const auto& reference = references[ref];
     auto& distp = dista[ref];
@@ -142,7 +142,7 @@ static array<float, 60> usrcat_features(ROMol& mol, int index)
   for (const auto& subset : subsets)
   {
     const auto n = subset.size();
-    for (size_t ref = 0; ref < num_references; ++ref)
+    for (size_t ref = 0; ref < s_Num_references; ++ref)
     {
       // Load distances from precalculated ones
       const auto& distp = dista[ref];
@@ -247,7 +247,8 @@ int main(int argc, char* argv[])
   size_t counter = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
-  params.numThreads = 10;
+  params.numThreads = 8;
+  params.useRandomCoords = true; // this parameter is used to make the process faster
   params.maxIterations = 6;
   SDWriter writer(&conf_file);
 

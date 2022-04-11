@@ -237,19 +237,20 @@ int main(int argc, char* argv[])
 
   // Initalize constants
   const string pdbqt_extension = ".pdbqt";
-  
+
   // Initialize variables
   string line, compound, smiles, next_line;
   int pos;
   array<float, 60> features;
   array<float, 4> realfprop;
   array<int16_t, 5> realiprop;
-  size_t counter = 0;
+  size_t processed_ligand = 0;
+  size_t all_ligands = 0;
   EmbedParameters params(srETKDGv3);
   params.randomSeed = 209;
   params.numThreads = 8;
   params.useRandomCoords = true; // this parameter is used to make the process faster
-  params.maxIterations = 6;
+  params.maxIterations = 3;
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder
@@ -257,7 +258,7 @@ int main(int argc, char* argv[])
   {
     if (entry.path().extension() == pdbqt_extension)
     {
-      std::cout << "Processing molecule Number° " << counter << endl;
+      std::cout << "Processing molecule Number° " << processed_ligand << '/' << all_ligands << endl;
       std::cout << "Path of the molecule " << entry.path() << endl;
       boost_ifstream ifs(entry.path());
       while (getline(ifs, line))
@@ -345,7 +346,7 @@ int main(int argc, char* argv[])
                   features = usrcat_features(mol, i);
                   write_to_binary<array<float, 60>>(features, usrcatf64);
                 }
-                counter++;
+                processed_ligand++;
                 break;
               }
               else
@@ -362,6 +363,7 @@ int main(int argc, char* argv[])
           }
         }
       }
+      all_ligands++;
     }
   }
   std::cout << "Process completed! for " << counter << " compounds" << endl;

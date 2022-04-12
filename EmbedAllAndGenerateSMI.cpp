@@ -245,7 +245,8 @@ int main(int argc, char* argv[])
   // Initialize variables
   string line, compound, smiles, next_line;
   int pos;
-  vector<thread> thread_pool(3); // thread pool with 3 threads
+  vector<thread> thread_pool; 
+  thread_pool.resize(3); // thread pool with 3 threads
   array<float, 60> features;
   array<float, 4> realfprop;
   array<int16_t, 5> realiprop;

@@ -201,10 +201,9 @@ static inline auto stripWhiteSpaces(string& str)
 }
 
 template<typename T>
-static inline void write_to_binary(T& buf, const path output_path)
+static inline void write_to_binary(T& buf, boost_ofstream& ofs)
 {
   // pass the ofstream object by reference, to avoid declaring it each time
-  boost_ofstream ofs(output_path, ios::binary | ios::app);
   const size_t num_bytes = sizeof(buf);
   ofs.write(reinterpret_cast<char*>(buf.data()), num_bytes);
 }
@@ -229,13 +228,16 @@ int main(int argc, char* argv[])
   p = string(conformers_file).find('.');
   const path rfprop_file = string(conformers_file).substr(0, p) + "_4properties.f32";
   const path riprop_file = string(conformers_file).substr(0, p) + "_5properties.i16";
-  const path usrcatf64 = string(conformers_file).substr(0, p) + "_usrcat.f64";
+  const path usrcatf64_file = string(conformers_file).substr(0, p) + "_usrcat.f64";
 
   // Inialize the output files
   boost_ofstream conf_file(conformers_file, ios::app);
   boost_ofstream smifile(smi_file, ios::app);
   boost_ofstream smilesfile(only_smiles_txt, ios::app);
   boost_ofstream id_file(only_id_txt, ios::app);
+  boost_ofstream rfprop(rfprop_file, ios::binary | ios::app);
+  boost_ofstream riprop(riprop_file, ios::binary | ios::app);
+  boost_ofstream usrcatf64(usrcatf64_file, ios::binary | ios::app);
 
   // Initalize constants
   const string pdbqt_extension = ".pdbqt";
@@ -325,9 +327,9 @@ int main(int argc, char* argv[])
                 realfprop[3] = calcLabuteASA(mol);
                 // add this task to the thread inside the threads vector
                 thread_pool.emplace_back([&]() {
-                  write_to_binary<array<float, 4>>(realfprop, rfprop_file);
+                  write_to_binary<array<float, 4>>(realfprop, rfprop);
                 });
-                write_to_binary<array<float, 4>>(realfprop, rfprop_file);
+                //write_to_binary<array<float, 4>>(realfprop, rfprop_file);
 
                 // generate 5 chemical properties for the molecules
                 realiprop[0] = mol.getNumHeavyAtoms();
@@ -337,7 +339,7 @@ int main(int argc, char* argv[])
                 realiprop[4] = calcNumRings(mol);
                 // add this task to the thread inside the threads vector
                 thread_pool.emplace_back([&]() {
-         	  write_to_binary<array<int16_t, 5>>(realiprop, riprop_file);
+         	  write_to_binary<array<int16_t, 5>>(realiprop, riprop);
                 });
 
                 std::cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
@@ -358,11 +360,12 @@ int main(int argc, char* argv[])
                     write_to_binary<array<float, 60>>(features, usrcatf64);
                   }
                 });
-                for (int i = 0; i < 4; i++)
+
+                /*for (int i = 0; i < 4; i++)
                 {
                   features = usrcat_features(mol, i);
                   write_to_binary<array<float, 60>>(features, usrcatf64);
-                }
+                }*/
                 processed_ligand++;
                 break;
               }
@@ -385,6 +388,7 @@ int main(int argc, char* argv[])
       {
         th.join();
       }
+      thread_pool.clear();
       all_ligands++;
     }
   }

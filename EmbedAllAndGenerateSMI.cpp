@@ -14,6 +14,7 @@
 #include <thread>
 #include <array>
 #include <vector>
+#include <mutex>
 #include <GraphMol/FileParsers/MolSupplier.h>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
@@ -200,10 +201,13 @@ static inline auto stripWhiteSpaces(string& str)
   str.erase(remove(str.begin(), str.end(), ' '), str.end());
 }
 
+static mutex s_Mu;
+
 template<typename T>
 static inline void write_to_binary(T& buf, boost_ofstream& ofs)
 {
   // pass the ofstream object by reference, to avoid declaring it each time
+  lock_guard<mutex> lock(s_Mu);
   const size_t num_bytes = sizeof(buf);
   ofs.write(reinterpret_cast<char*>(buf.data()), num_bytes);
 }
@@ -327,9 +331,9 @@ int main(int argc, char* argv[])
                 realfprop[2] = calcTPSA(mol);
                 realfprop[3] = calcLabuteASA(mol);
                 // add this task to the thread inside the threads vector
-                thread_pool.emplace_back([&]() {
+                thread_pool.emplace_back([&]() { 
                   write_to_binary<array<float, 4>>(realfprop, rfprop);
-                });
+                }); // emplace_back to avoid copying, so that we can pass the parameters directly
                 //write_to_binary<array<float, 4>>(realfprop, rfprop_file);
 
                 // generate 5 chemical properties for the molecules

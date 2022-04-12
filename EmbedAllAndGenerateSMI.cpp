@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <string>
+#include <thread>
 #include <array>
 #include <vector>
 #include <GraphMol/FileParsers/MolSupplier.h>
@@ -202,6 +203,7 @@ static inline auto stripWhiteSpaces(string& str)
 template<typename T>
 static inline void write_to_binary(T& buf, const path output_path)
 {
+  // pass the ofstream object by reference, to avoid declaring it each time
   boost_ofstream ofs(output_path, ios::binary | ios::app);
   const size_t num_bytes = sizeof(buf);
   ofs.write(reinterpret_cast<char*>(buf.data()), num_bytes);
@@ -241,6 +243,7 @@ int main(int argc, char* argv[])
   // Initialize variables
   string line, compound, smiles, next_line;
   int pos;
+  vector<thread> thread_pool(3); // thread pool with 3 threads
   array<float, 60> features;
   array<float, 4> realfprop;
   array<int16_t, 5> realiprop;
@@ -250,7 +253,7 @@ int main(int argc, char* argv[])
   params.randomSeed = 209;
   params.numThreads = 8;
   params.useRandomCoords = true; // this parameter is used to make the process faster
-  params.maxIterations = 3;
+  params.maxIterations = 3; // max iterations to 1
   SDWriter writer(&conf_file);
 
   // Search for pdbqt files into the pdbqt folder
@@ -320,6 +323,10 @@ int main(int argc, char* argv[])
                 realfprop[1] = calcClogP(mol);
                 realfprop[2] = calcTPSA(mol);
                 realfprop[3] = calcLabuteASA(mol);
+                // add this task to the thread inside the threads vector
+                thread_pool.emplace_back([&]() {
+                  write_to_binary<array<float, 4>>(realfprop, rfprop_file);
+                });
                 write_to_binary<array<float, 4>>(realfprop, rfprop_file);
 
                 // generate 5 chemical properties for the molecules
@@ -328,7 +335,10 @@ int main(int argc, char* argv[])
                 realiprop[2] = calcNumHBA(mol);
                 realiprop[3] = calcNumRotatableBonds(mol);
                 realiprop[4] = calcNumRings(mol);
-                write_to_binary<array<int16_t, 5>>(realiprop, riprop_file);
+                // add this task to the thread inside the threads vector
+                thread_pool.emplace_back([&]() {
+         	  write_to_binary<array<int16_t, 5>>(realiprop, riprop_file);
+                });
 
                 std::cout << confIds.size() << " Conformers of " << compound << '\t' << smiles << " are succefully generated!" << endl;
                 id_file << compound << '\n';
@@ -341,6 +351,13 @@ int main(int argc, char* argv[])
                 }
 
                 // generate the USRCAT features for each conformer
+                thread_pool.emplace_back([&]() {
+                  for (int i = 0; i < 4; i++)
+                  {
+                    features = usrcat_features(mol, i);
+                    write_to_binary<array<float, 60>>(features, usrcatf64);
+                  }
+                });
                 for (int i = 0; i < 4; i++)
                 {
                   features = usrcat_features(mol, i);
@@ -362,6 +379,11 @@ int main(int argc, char* argv[])
             }
           }
         }
+      }
+      // join the threads
+      for (thread& th : thread_pool)
+      {
+        th.join();
       }
       all_ligands++;
     }

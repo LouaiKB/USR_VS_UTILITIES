@@ -50,29 +50,23 @@ public:
     m_Rfprop_file = conformers_file.substr(0, p) + "_4properties.f32";
     m_Riprop_file = conformers_file.substr(0, p) + "_5properties.i16";
     m_Usrcat_file = conformers_file.substr(0, p) + "_usrcat.f64";
-
-    // m_Conf_file.open()
+    m_Ligands_counter = 0;
+    m_Conf_file.open(m_Conformers_path, ios::app);
+    m_Id_file.open(m_Only_id, ios::app);
+    m_Smiles_file.open(m_Only_smiles, ios::app);
+    m_Smi_file.open(m_Smi_path, ios::app);
+    m_usrcatf64.open(m_Usrcat_file, ios::binary | ios::app);
   }
   ~MoleculesProcess() 
   {
-  }
-
-  template<typename T>
-  static float dist2(const T& p0, const T& p1)
-  {
-    lock_guard<mutex> lock(m_Mu); // should i leave this here?
-    const auto d0 = p0[0] - p1[0];
-    const auto d1 = p0[1] - p1[1];
-    const auto d2 = p0[2] - p1[2];
-    return d0 * d0 + d1 * d1 + d2 * d2;
-  }
-
-  template<typename T>
-  static void write_binary(T& buf);
-
-  static inline void stripWhiteSpaces(string& str)
-  {
-    str.erase(remove(str.begin(), str.end(), ' '), str.end());  
+    m_Conf_file.close();
+    m_Id_file.close();
+    m_Smiles_file.close();
+    m_Smi_file.close();
+    m_Conf_file.close();
+    m_riprop.close();
+    m_rfprop.close();
+    m_usrcatf64.close();
   }
 
   void process(const size_t start_chunk, const size_t end_chunk, vector<path>& pdbqts_vector)
@@ -85,27 +79,27 @@ public:
     params.numThreads = 4; // this may cause a problem
     params.useRandomCoords = true;
     params.maxIterations = 3;
-    m_Conf_file.open(m_Conformers_path, ios::app);
     SDWriter writer(&m_Conf_file);
     for (size_t counter = start_chunk; counter < end_chunk; ++counter)
     {
-      pdbqt_ifs.open(pdbqts_vector[counter]);
+      std::cout << "Iteration N° " << counter << " Number of processed ligands: " << m_Ligands_counter << endl;
+      boost_ifstream pdbqt_ifs(pdbqts_vector[counter]);
       while (getline(pdbqt_ifs, line))
       {
         if (line.find("Compound:") != string::npos)
         {
           pos = line.find(':');
           compound = line.substr(pos + 1);
-          MoleculesProcess::stripWhiteSpaces(compound);
+          stripWhiteSpaces(compound);
         }
         if (line.find("SMILES:") != string::npos)
         {
           pos = line.find(':');
           smiles = line.substr(pos + 1);
-          MoleculesProcess::stripWhiteSpaces(smiles);
+          stripWhiteSpaces(smiles);
           if (getline(pdbqt_ifs, next_line))
           {
-            if (!next_line.find("REMARK") != string::npos)
+            if (next_line.find("REMARK") == string::npos)
             {
               // smiles is splitted, trying to fix it
               smiles = smiles + next_line;
@@ -134,7 +128,6 @@ public:
                 m_Realfprop[2] = calcTPSA(mol);
                 m_Realfprop[3] = calcLabuteASA(mol);
 
-
                 m_Realiprop[0] = mol.getNumHeavyAtoms();
                 m_Realiprop[1] = calcNumHBD(mol);
                 m_Realiprop[2] = calcNumHBA(mol);
@@ -149,10 +142,7 @@ public:
                 m_riprop.write(reinterpret_cast<char*>(m_Realiprop.data()), num_bytes_reali);
 
                 cout << confIds.size() << " Conformers of " << compound << " : " << smiles << " are successfully generated!" << endl;
-                m_Id_file.open(m_Only_id, ios::app);
-                m_Smiles_file.open(m_Only_smiles, ios::app);
-                m_Smi_file.open(m_Smi_path, ios::app);
-                m_usrcatf64.open(m_Usrcat_file, ios::binary | ios::app);
+                m_Ligands_counter++;
                 
                 m_Id_file << compound << '\n';
                 m_Smiles_file << smiles << '\n';
@@ -169,13 +159,6 @@ public:
                   const size_t num_bytes = sizeof(m_Features);
                   m_usrcatf64.write(reinterpret_cast<char*>(m_Features.data()), num_bytes);
                 }
-                m_Id_file.close();
-                m_Smiles_file.close();
-                m_Smi_file.close();
-                m_Conf_file.close();
-                m_riprop.close();
-                m_rfprop.close();
-                m_usrcatf64.close();
               }
             }
             catch (const runtime_error& e)
@@ -192,13 +175,24 @@ private:
   mutex m_Mu;
   path m_Conformers_path, m_Smi_path, m_Only_smiles, m_Only_id, m_Rfprop_file, m_Riprop_file, m_Usrcat_file;
   boost_ofstream m_Conf_file, m_Smi_file, m_Smiles_file, m_Id_file, m_rfprop, m_riprop, m_usrcatf64;
-  boost_ifstream pdbqt_ifs;
   array<float, 4> m_Realfprop;
   array<int16_t, 5> m_Realiprop;
   array<float, 60> m_Features;
+  size_t m_Ligands_counter;
+  inline void stripWhiteSpaces(string& str)
+  {
+    str.erase(remove(str.begin(), str.end(), ' '), str.end());  
+  }
+  template<typename T>
+  float dist2(const T& p0, const T& p1)
+  {
+    const auto d0 = p0[0] - p1[0];
+    const auto d1 = p0[1] - p1[1];
+    const auto d2 = p0[2] - p1[2];
+    return d0 * d0 + d1 * d1 + d2 * d2;
+  }
   array<float, 60> usrcat_features(ROMol& mol, int index)
   {
-    lock_guard<mutex> lock(m_Mu);
     const size_t num_references = 4;
     const size_t num_subsets = 5;
     const array<string, 5> SubsetSMARTS
@@ -395,4 +389,6 @@ int main(int argc, char* argv[])
 
   for (auto& thread : thread_pool)
     thread.get();
+
+  cout << "Process completed!" << endl;
 }

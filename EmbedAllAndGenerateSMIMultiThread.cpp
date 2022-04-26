@@ -9,21 +9,20 @@
  */
 
 #include <iostream>
-#include <fstream>
 #include <string>
-#include <chrono>
+#include <array>
+#include <vector>
 #include <future>
-#include <GraphMol/FileParsers/MolSupplier.h>
+#include <mutex>
+#include <chrono>
+#include <thread>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <GraphMol/DistGeomHelpers/Embedder.h>
 #include <GraphMol/FileParsers/MolWriters.h>
-#include <GraphMol/FragCatalog/FragFPGenerator.h>
+#include <GraphMol/Substruct/SubstructMatch.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/Descriptors/MolDescriptors.h>
-#include <GraphMol/Substruct/SubstructMatch.h>
-#include <boost/filesystem/fstream.hpp>
-#include <mutex>
-#include <thread>
-#include <boost/filesystem/operations.hpp>
 
 using namespace std;
 using namespace std::chrono;
@@ -39,34 +38,22 @@ using boost_ofstream = boost::filesystem::ofstream;
 class MoleculesProcess
 {
 public:
-  explicit MoleculesProcess(const string& conformers_file, const string& smi_file)
+  explicit MoleculesProcess(const string& conformers_file)
   {
     m_Conformers_path = conformers_file;
-    m_Smi_path = smi_file;
-    int p = smi_file.find('.');
-    m_Only_smiles = smi_file.substr(0, p) + "_only_smiles.txt";
-    m_Only_id = smi_file.substr(0, p) + "_only_id.txt";
-    p = conformers_file.find('.');
+    int p = conformers_file.find('.');
+    m_Only_smiles = conformers_file.substr(0, p) + "_only_smiles.txt";
+    m_Only_id = conformers_file.substr(0, p) + "_only_id.txt";
     m_Rfprop_file = conformers_file.substr(0, p) + "_4properties.f32";
     m_Riprop_file = conformers_file.substr(0, p) + "_5properties.i16";
     m_Usrcat_file = conformers_file.substr(0, p) + "_usrcat.f64";
-    m_Ligands_counter = 0;
+    lig_count = 0;
     m_Conf_file.open(m_Conformers_path, ios::app);
-    m_Id_file.open(m_Only_id, ios::app);
-    m_Smiles_file.open(m_Only_smiles, ios::app);
-    m_Smi_file.open(m_Smi_path, ios::app);
-    m_usrcatf64.open(m_Usrcat_file, ios::binary | ios::app);
   }
+
   ~MoleculesProcess() 
   {
     m_Conf_file.close();
-    m_Id_file.close();
-    m_Smiles_file.close();
-    m_Smi_file.close();
-    m_Conf_file.close();
-    m_riprop.close();
-    m_rfprop.close();
-    m_usrcatf64.close();
   }
 
   void process(const size_t start_chunk, const size_t end_chunk, vector<path>& pdbqts_vector)
@@ -76,27 +63,26 @@ public:
     int pos;
     EmbedParameters params(srETKDGv3);
     params.randomSeed = 209;
-    params.numThreads = 4; // this may cause a problem
+    params.numThreads = 8;
     params.useRandomCoords = true;
     params.maxIterations = 3;
     SDWriter writer(&m_Conf_file);
     for (size_t counter = start_chunk; counter < end_chunk; ++counter)
     {
-      std::cout << "Iteration N° " << counter << " Number of processed ligands: " << m_Ligands_counter << endl;
+      std::cout << "Iteration N° " << counter << " And generated ligands: " << lig_count <<  endl;
+      std::cout << "Processing file: " << pdbqts_vector[counter] << endl;
       boost_ifstream pdbqt_ifs(pdbqts_vector[counter]);
       while (getline(pdbqt_ifs, line))
       {
         if (line.find("Compound:") != string::npos)
         {
           pos = line.find(':');
-          compound = line.substr(pos + 1);
-          stripWhiteSpaces(compound);
+          compound = line.substr(pos + 2);
         }
         if (line.find("SMILES:") != string::npos)
         {
           pos = line.find(':');
-          smiles = line.substr(pos + 1);
-          stripWhiteSpaces(smiles);
+          smiles = line.substr(pos + 2);
           if (getline(pdbqt_ifs, next_line))
           {
             if (next_line.find("REMARK") == string::npos)
@@ -107,7 +93,6 @@ public:
           }
           if (smiles.find('q') != string::npos || smiles.find('r') != string::npos || smiles.find('s') != string::npos)
           {
-            // incorrect format of the smiles
             break;
           }
           else
@@ -119,8 +104,10 @@ public:
               auto& mol = *mol_ptr;
               mol.setProp("_Name", compound);
               const auto confIds = EmbedMultipleConfs(mol, 4, params);
+              
               if (confIds.empty())
                 break;
+              
               if (confIds.size() == 4)
               {
                 m_Realfprop[0] = calcExactMW(mol);
@@ -136,22 +123,25 @@ public:
 
                 m_rfprop.open(m_Rfprop_file, ios::binary | ios::app);
                 m_riprop.open(m_Riprop_file, ios::binary | ios::app);
+
                 const size_t num_bytes_realf = sizeof(m_Realfprop);
-                m_rfprop.write(reinterpret_cast<char*>(m_Realfprop.data()), num_bytes_realf);
                 const size_t num_bytes_reali = sizeof(m_Realiprop);
+
+                m_rfprop.write(reinterpret_cast<char*>(m_Realfprop.data()), num_bytes_realf);
                 m_riprop.write(reinterpret_cast<char*>(m_Realiprop.data()), num_bytes_reali);
 
                 cout << confIds.size() << " Conformers of " << compound << " : " << smiles << " are successfully generated!" << endl;
-                m_Ligands_counter++;
+                lig_count++;
+
+                m_Id_file.open(m_Only_id, ios::app);
+                m_Smiles_file.open(m_Only_smiles, ios::app);
+                m_usrcatf64.open(m_Usrcat_file, ios::binary | ios::app);
                 
                 m_Id_file << compound << '\n';
                 m_Smiles_file << smiles << '\n';
-                m_Smi_file << compound << '\t' << smiles << '\n';
 
                 for (const auto confId : confIds)
-                {
                   writer.write(mol, confId);
-                }
 
                 for (int i = 0; i < 4; i++)
                 {
@@ -159,10 +149,27 @@ public:
                   const size_t num_bytes = sizeof(m_Features);
                   m_usrcatf64.write(reinterpret_cast<char*>(m_Features.data()), num_bytes);
                 }
+
+                m_Id_file.close();
+                m_Smiles_file.close();
+                m_riprop.close();
+                m_rfprop.close();
+                m_usrcatf64.close();
               }
             }
-            catch (const runtime_error& e)
+            catch (const AtomValenceException& e)
             {
+              cerr << pdbqts_vector[counter] << " molecule raised an atom valence exception" << endl;
+              break;
+            }
+            catch (const AtomKekulizeException& e)
+            {
+              cerr << pdbqts_vector[counter] << " molecule raised an atom kekulize exception" << endl;
+              break;
+            }
+            catch (const AtomSanitizeException& e)
+            {
+              cerr << pdbqts_vector[counter] << " molecule raised an atom sanitize exception" << endl;
               break;
             }
           }
@@ -173,24 +180,12 @@ public:
 
 private:
   mutex m_Mu;
-  path m_Conformers_path, m_Smi_path, m_Only_smiles, m_Only_id, m_Rfprop_file, m_Riprop_file, m_Usrcat_file;
-  boost_ofstream m_Conf_file, m_Smi_file, m_Smiles_file, m_Id_file, m_rfprop, m_riprop, m_usrcatf64;
+  path m_Conformers_path, m_Only_smiles, m_Only_id, m_Rfprop_file, m_Riprop_file, m_Usrcat_file;
+  boost_ofstream m_Conf_file, m_Smiles_file, m_Id_file, m_rfprop, m_riprop, m_usrcatf64;
   array<float, 4> m_Realfprop;
   array<int16_t, 5> m_Realiprop;
   array<float, 60> m_Features;
-  size_t m_Ligands_counter;
-  inline void stripWhiteSpaces(string& str)
-  {
-    str.erase(remove(str.begin(), str.end(), ' '), str.end());  
-  }
-  template<typename T>
-  float dist2(const T& p0, const T& p1)
-  {
-    const auto d0 = p0[0] - p1[0];
-    const auto d1 = p0[1] - p1[1];
-    const auto d2 = p0[2] - p1[2];
-    return d0 * d0 + d1 * d1 + d2 * d2;
-  }
+  size_t lig_count;
   array<float, 60> usrcat_features(ROMol& mol, int index)
   {
     const size_t num_references = 4;
@@ -228,7 +223,6 @@ private:
       }
     }
     const auto& subset0 = subsets.front();
-    // assert(subset0.size() == num_points);
 
     for (auto& ref : references)
     {
@@ -338,49 +332,62 @@ private:
     }
     return features;
   }
+  template<typename T>
+  float dist2(const T& p0, const T& p1)
+  {
+    const auto d0 = p0[0] - p1[0];
+    const auto d1 = p0[1] - p1[1];
+    const auto d2 = p0[2] - p1[2];
+    return d0 * d0 + d1 * d1 + d2 * d2;
+  }
 };
 
 
 int main(int argc, char* argv[])
 {
-  if (argc != 5)
+  if (argc != 4)
   {
-    cerr << "Usage: ./EmbedAllAndGenerateSMIL [PDBQT FOLDER] [CONFORMERS SDF] [OUTPUT SMI] [NUM_PDBQT]" << endl;
+    cerr << "Usage: ./EmbedAllAndGenerateSMIL [PDBQT FOLDER] [CONFORMERS SDF] [NUM_PDBQT]" << endl;
     return 1;
   }
+  // const auto started = system_clock::now();
+  cout << "started!" << endl;
 
   // Obtain the files from the CLI argument
   const auto pdbqt_folder = argv[1];
   const auto conformers_file = argv[2];
-  const auto smi_file = argv[3];
-  const auto num_of_pdbqt = atoi(argv[4]);
+  const auto num_of_pdbqt = atoi(argv[3]);
 
   // Initalize constant
   const string pdbqt_extension = ".pdbqt";
-  const int num_threads = 30;
+  const size_t num_threads = thread::hardware_concurrency();
+  const auto num_chunks = num_threads << 4;
+
   // Initialize vectors
   vector<path> pdbqts_vector;
   vector<future<void>> thread_pool;
+  cout << "reservation .." << endl;
   pdbqts_vector.reserve(num_of_pdbqt);
   thread_pool.reserve(num_threads); // a thread pool with 30 threads
 
   // object
-  MoleculesProcess worker(conformers_file, smi_file);
+  MoleculesProcess worker(conformers_file);
 
+  cout << "Processing the vector ..." << endl;
   // Search for pdbqt files into the pdbqt folder
   for (const auto& entry : recursive_directory_iterator(pdbqt_folder))
   {
     if (entry.path().extension() == pdbqt_extension)
     {
-      pdbqts_vector.push_back(entry.path());
+      pdbqts_vector.emplace_back(entry.path());
     }
   }
 
   size_t start = 0;
   size_t num_files = pdbqts_vector.size();
-  size_t chunk_size = (num_files - start) / num_threads;
+  size_t chunk_size = (num_files - start) / num_chunks;
 
-  for (int i = 0; i < num_threads; i++)
+  for (int i = 0; i < num_chunks; i++)
   {
     size_t start_chunk = chunk_size * i;
     size_t end_chunk = chunk_size * i + chunk_size;
@@ -390,5 +397,11 @@ int main(int argc, char* argv[])
   for (auto& thread : thread_pool)
     thread.get();
 
-  cout << "Process completed!" << endl;
+  // const auto finished = system_clock::now();
+  // const auto runtime = (finished - started).count() * 1e-9;
+
+  // cout << "process finished in " << setprecision(3) << runtime << " seconds" << endl; 
+
+  cout << "Process finished!" <<endl;
+
 }

@@ -397,5 +397,5 @@ int main(int argc, char* argv[])
       all_ligands++;
     }
   }
-  std::cout << "Process completed! for " << counter << " compounds" << endl;
+  std::cout << "Process completed! for " << all_ligands << " compounds" << endl;
 }

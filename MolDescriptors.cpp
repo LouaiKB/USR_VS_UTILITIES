@@ -43,7 +43,7 @@ int main(int argc, char* argv[])
 	{
 		const unique_ptr<ROMol> mol_ptr(smi.next());
 		const auto& mol = *mol_ptr;
-		cout << "Processing molecule " << counter << endl;
+		std::cout << "Processing molecule " << counter << endl;
 		// generate 4 chemical properties for the molecules
 		real4prop << calcExactMW(mol) << '\t'
 							<< calcClogP(mol) << '\t'

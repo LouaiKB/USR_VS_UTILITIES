@@ -41,8 +41,8 @@ using boost_ofstream = boost::filesystem::ofstream;
 class io_service_pool : public io_service, public vector<future<void>>
 {
 public:
-	//! Creates a number of threads to listen to the post event of an io service.
-	explicit io_service_pool(const unsigned concurrency) : w(make_unique<work>(*this))
+  //! Creates a number of threads to listen to the post event of an io service.
+  explicit io_service_pool(const unsigned concurrency) : w(make_unique<work>(*this))
   {
     reserve(concurrency);
     for (unsigned i = 0; i < concurrency - 5; ++i)
@@ -54,8 +54,8 @@ public:
     }
   }
 
-	//! Waits for all the posted work and created threads to complete, and propagates thrown exceptions if any.
-	void wait()
+  //! Waits for all the posted work and created threads to complete, and propagates thrown exceptions if any.
+  void wait()
   {
     w.reset();
     for (auto& f : *this)
@@ -72,22 +72,22 @@ template <typename T>
 class safe_counter
 {
 public:
-	//! Initializes the counter to 0 and its expected hit value to z.
-	void init(const T z)
+  //! Initializes the counter to 0 and its expected hit value to z.
+  void init(const T z)
   {
     n = z;
     i = 0;
   }
 
-	//! Increments the counter by 1 in a thread safe manner, and wakes up the calling thread waiting on the internal mutex.
-	void increment()
+  //! Increments the counter by 1 in a thread safe manner, and wakes up the calling thread waiting on the internal mutex.
+  void increment()
   {
     lock_guard<mutex> guard(m);
     if (++i == n) cv.notify_one();
   }
 
-	//! Waits until the counter reaches its expected hit value.
-	void wait()
+  //! Waits until the counter reaches its expected hit value.
+  void wait()
   {
     unique_lock<mutex> lock(m);
     if (i < n)
@@ -95,7 +95,7 @@ public:
   }
 
 private:
-	mutex m;
+        mutex m;
 	condition_variable cv;
 	T n; //!< Expected hit value.
 	T i; //!< Counter value.
@@ -438,13 +438,10 @@ int main(int argc, char* argv[])
           }
         }
       }
-
-
       cnt.increment();
     });
   }
   cnt.wait();
-
   const auto finished = system_clock::now();
   const auto runtime = (finished - started).count() * 1e-9;
 

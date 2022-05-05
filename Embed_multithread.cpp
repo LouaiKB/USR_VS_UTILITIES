@@ -1,7 +1,7 @@
 /**
  * @file EmbedPDBQTMols.cpp
  * @author Louai KASSA BAGHDOUCHE
- * @brief A C++ code to generate conformers from multiple pdbqt files, by fetching the SMILES and ID from PDBQT and generate SMI files
+ * @brief A C++ code to generate conformers from multiple pdbqt files, by fetching the SMILES and ID from PDBQT and generate SMI files, with multithreading
  * @date 2022-03-29
  * 
  * @copyright Copyright (c) 2022
@@ -45,7 +45,7 @@ public:
   explicit io_service_pool(const unsigned concurrency) : w(make_unique<work>(*this))
   {
     reserve(concurrency);
-    for (unsigned i = 0; i < concurrency - 5; ++i)
+    for (unsigned i = 0; i < concurrency; ++i)
     {
       emplace_back(async(launch::async, [&]()
       {
@@ -64,7 +64,7 @@ public:
     }
   }
 private:
-	unique_ptr<work> w; //!< An io service work object, resetting which to nullptr signals the io service to stop receiving additional work.
+   unique_ptr<work> w; //!< An io service work object, resetting which to nullptr signals the io service to stop receiving additional work.
 };
 
 //! Represents a thread safe counter.
@@ -83,7 +83,8 @@ public:
   void increment()
   {
     lock_guard<mutex> guard(m);
-    if (++i == n) cv.notify_one();
+    if (++i == n) 
+       cv.notify_one();
   }
 
   //! Waits until the counter reaches its expected hit value.
@@ -95,15 +96,14 @@ public:
   }
 
 private:
-        mutex m;
-	condition_variable cv;
-	T n; //!< Expected hit value.
-	T i; //!< Counter value.
+   mutex m;
+   condition_variable cv;
+   T n; //!< Expected hit value.
+   T i; //!< Counter value.
 };
 
-
 template<typename T>
-float dist2(const T& p0, const T& p1)
+inline float dist2(const T& p0, const T& p1)
 {
   const auto d0 = p0[0] - p1[0];
   const auto d1 = p0[1] - p1[1];
@@ -262,7 +262,7 @@ int main(int argc, char* argv[])
 {
   if (argc != 4)
   {
-    cerr << "Usage: ./EmbedAllAndGenerateSMIL [PDBQT FOLDER] [CONFORMERS SDF] [NUM_PDBQT]" << endl;
+    cerr << "Usage: ./EmbedAllAndGenerateSMI [PDBQT FOLDER] [CONFORMERS SDF] [NUM_PDBQT]" << endl;
     return 1;
   }
   const auto started = system_clock::now();
@@ -275,11 +275,11 @@ int main(int argc, char* argv[])
 
   // create strings file from the input
   int p = conformers_file.find('.');
-  string only_smiles = conformers_file.substr(0, p) + "_only_smiles.txt";
-  string only_id = conformers_file.substr(0, p) + "_only_id.txt";
-  string rfprop_file = conformers_file.substr(0, p) + "_4properties.f32";
-  string riprop_file = conformers_file.substr(0, p) + "_5properties.i16";
-  string usrcat_file = conformers_file.substr(0, p) + "_usrcat.f64";
+  const string only_smiles = conformers_file.substr(0, p) + "_only_smiles.txt";
+  const string only_id = conformers_file.substr(0, p) + "_only_id.txt";
+  const string rfprop_file = conformers_file.substr(0, p) + "_4properties.f32";
+  const string riprop_file = conformers_file.substr(0, p) + "_5properties.i16";
+  const string usrcat_file = conformers_file.substr(0, p) + "_usrcat.f64";
 
   // Initalize constant
   const string pdbqt_extension = ".pdbqt";
@@ -326,22 +326,21 @@ int main(int argc, char* argv[])
   size_t lig_count = 0;
   size_t num_files = pdbqts_vector.size();
   const size_t chunk_size = num_files / num_chunks;
-  
   // Generate conformers and write properties in files in a multithreading way
   cnt.init(num_chunks);
   for (size_t l = 0; l < num_chunks; ++l)
   {
     io.post([&, l] ()
     {
-      const auto chunk_beg = chunk_size * l;
-      const auto chunk_end = chunk_size * l + chunk_size;
       string line, compound, smiles, next_line;
       int pos;
       EmbedParameters params(srETKDGv3);
       params.randomSeed = 209;
-      params.numThreads = 8;
+      params.numThreads = 10;
       params.useRandomCoords = true;
-      params.maxIterations = 10;
+      params.maxIterations = 5;
+      const auto chunk_beg = chunk_size * l;
+      const auto chunk_end = chunk_size * l + chunk_size;
       for (size_t counter = chunk_beg; counter < chunk_end; ++counter)
       {
         boost_ifstream pdbqt_ifs(pdbqts_vector[counter]);
@@ -400,8 +399,12 @@ int main(int argc, char* argv[])
                     std::cout << "Processing file: " << pdbqts_vector[counter] << endl;
                     cout << confIds.size() << " Conformers of " << compound << " : " << smiles << " are successfully generated!" << endl;
                     lig_count++;
-                    for (const auto confId : confIds) {
+                    for (const auto confId : confIds)
+                    {
                       writer.write(mol, confId);
+                      usrcat_features = usrcat_generator(mol, confId);
+                      const size_t num_bytes = sizeof(usrcat_features);
+                      ofs_usrcat.write(reinterpret_cast<char*>(usrcat_features.data()), num_bytes);
                     }
                     const size_t num_bytes_realf = sizeof(realfprop);
                     const size_t num_bytes_reali = sizeof(realiprop);
@@ -409,14 +412,7 @@ int main(int argc, char* argv[])
                     ofs_riprop.write(reinterpret_cast<char*>(realiprop.data()), num_bytes_reali);
                     ofs_id << compound << '\n';
                     ofs_smi << smiles << '\n';
-                    for (int i = 0; i < 4; i++)
-                    {
-                      usrcat_features = usrcat_generator(mol, i);
-                      const size_t num_bytes = sizeof(usrcat_features);
-                      ofs_usrcat.write(reinterpret_cast<char*>(usrcat_features.data()), num_bytes);
-                    }
                   }
-
                 }
               }
               catch (const AtomValenceException& e)
@@ -444,7 +440,5 @@ int main(int argc, char* argv[])
   cnt.wait();
   const auto finished = system_clock::now();
   const auto runtime = (finished - started).count() * 1e-9;
-
   cout << "process finished in " << setprecision(3) << runtime << " seconds" << endl; 
-
 }

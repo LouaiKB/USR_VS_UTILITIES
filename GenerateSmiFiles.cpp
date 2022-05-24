@@ -19,12 +19,6 @@ using namespace boost::filesystem;
 using boost_ofstream = boost::filesystem::ofstream;
 using boost_ifstream = boost::filesystem::ifstream;
 
-// function to remove whitespaces
-inline auto stripWhiteSpaces(string& str)
-{
-    str.erase(remove(str.begin(), str.end(), ' '), str.end());
-}
-
 
 int main(int argc, char* argv[])
 {
@@ -51,22 +45,20 @@ int main(int argc, char* argv[])
     {
         if (entry.path().extension() == pdbqt_extension)
         {
-            cout << "Porcessing molecule Number° " << counter << endl;
+            std::cout << "Porcessing molecule Number° " << counter << endl;
             boost_ifstream ifs(entry.path());
             while (getline(ifs, line))
             {
                 if (line.find("Compound:") != string::npos)
                 {
                     pos = line.find(':');
-                    compound = line.substr(pos + 1);
-                    stripWhiteSpaces(compound);
-                }
+                    compound = line.substr(pos + 2);
+		}
 
                 if (line.find("SMILES:") != string::npos)
                 {
                     pos = line.find(':');
                     smiles = line.substr(pos + 1);
-                    stripWhiteSpaces(smiles);
                     smilesfile << compound << '\t' << smiles << '\n';
                     break;
                 }
@@ -74,5 +66,5 @@ int main(int argc, char* argv[])
             counter++;
         }
     }
-    cout << "Process finished, generating id and smiles for " << counter << " pdbqt files." << endl;
+    std::cout << "Process finished, generating id and smiles for " << counter << " pdbqt files." << endl;
 }

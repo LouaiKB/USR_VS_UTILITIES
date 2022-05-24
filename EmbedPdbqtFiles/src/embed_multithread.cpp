@@ -25,6 +25,8 @@
 #include <GraphMol/Substruct/SubstructMatch.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/Descriptors/MolDescriptors.h>
+#include "io_service_pool.hpp"
+#include "safe_counter.hpp"
 
 using namespace std;
 using namespace std::chrono;
@@ -37,70 +39,6 @@ using namespace RDKit::DGeomHelpers;
 using namespace boost::filesystem;
 using boost_ifstream = boost::filesystem::ifstream;
 using boost_ofstream = boost::filesystem::ofstream;
-
-class io_service_pool : public io_service, public vector<future<void>>
-{
-public:
-  //! Creates a number of threads to listen to the post event of an io service.
-  explicit io_service_pool(const unsigned concurrency) : w(make_unique<work>(*this))
-  {
-    reserve(concurrency);
-    for (unsigned i = 0; i < concurrency; ++i)
-    {
-      emplace_back(async(launch::async, [&]()
-      {
-        run();
-      }));
-    }
-  }
-
-  //! Waits for all the posted work and created threads to complete, and propagates thrown exceptions if any.
-  void wait()
-  {
-    w.reset();
-    for (auto& f : *this)
-    {
-      f.get();
-    }
-  }
-private:
-   unique_ptr<work> w; //!< An io service work object, resetting which to nullptr signals the io service to stop receiving additional work.
-};
-
-//! Represents a thread safe counter.
-template <typename T>
-class safe_counter
-{
-public:
-  //! Initializes the counter to 0 and its expected hit value to z.
-  void init(const T z)
-  {
-    n = z;
-    i = 0;
-  }
-
-  //! Increments the counter by 1 in a thread safe manner, and wakes up the calling thread waiting on the internal mutex.
-  void increment()
-  {
-    lock_guard<mutex> guard(m);
-    if (++i == n) 
-       cv.notify_one();
-  }
-
-  //! Waits until the counter reaches its expected hit value.
-  void wait()
-  {
-    unique_lock<mutex> lock(m);
-    if (i < n)
-      cv.wait(lock);
-  }
-
-private:
-   mutex m;
-   condition_variable cv;
-   T n; //!< Expected hit value.
-   T i; //!< Counter value.
-};
 
 template<typename T>
 inline float dist2(const T& p0, const T& p1)

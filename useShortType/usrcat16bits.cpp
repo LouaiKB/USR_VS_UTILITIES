@@ -16,14 +16,14 @@ using namespace RDKit::MolOps;
 using USRCAT_DESCRIPTORS = array<int16_t, 60>;
 
 template<typename T>
-inline float dist2(const T& p0, const T& p1) {
+static inline float dist2(const T& p0, const T& p1) {
   const auto d0 = p0[0] - p1[0];
   const auto d1 = p0[1] - p1[1];
   const auto d2 = p0[2] - p1[2];
   return d0 * d0 + d1 * d1 + d2 * d2;
 }
 
-USRCAT_DESCRIPTORS usrcat_generator(ROMol& mol) {
+static USRCAT_DESCRIPTORS usrcat_generator(ROMol& mol) {
   const size_t num_references = 4;
   const size_t num_subsets = 5;
   const array<string, 5> SubsetSMARTS
@@ -148,17 +148,19 @@ USRCAT_DESCRIPTORS usrcat_generator(ROMol& mol) {
   return features;
 }
 
-int main(int argc, char* argv[])
-{
-    const auto conf = argv[1];
-    SDMolSupplier sup(conf, true, false, true);
-    while (!sup.atEnd())
-    {
-      const unique_ptr<ROMol> mol_ptr(sup.next());
-      auto& mol = *mol_ptr;
-      cerr << mol.getProp<string>("_Name") << endl;
-      auto usrcat = usrcat_generator(mol);
-      cout.write(reinterpret_cast<char*>(usrcat.data()), sizeof(USRCAT_DESCRIPTORS));
-    }
-    return 0;
+int main(int argc, char* argv[]) {
+  if (argc != 2) {
+    cerr << "./usrcat16bits [INPUT]" << endl;
+    return 1;
+  }
+  const auto conf = argv[1];
+  SDMolSupplier sup(conf, true, false, true);
+  while (!sup.atEnd()) {
+    const unique_ptr<ROMol> mol_ptr(sup.next());
+    auto& mol = *mol_ptr;
+    cerr << mol.getProp<string>("_Name") << endl;
+    auto usrcat = usrcat_generator(mol);
+    cout.write(reinterpret_cast<char*>(usrcat.data()), sizeof(USRCAT_DESCRIPTORS));
+  }
+  return 0;
 }

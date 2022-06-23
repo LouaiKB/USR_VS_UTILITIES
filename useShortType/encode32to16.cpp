@@ -75,6 +75,10 @@ static void read_and_transform(const path& src_file, const path& output_file) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        cerr << "./encode32to16 [INPUT] [OUTPUT]" << endl;
+        return 1;
+    }
     const path input32_t = argv[1];
     const path output16_t = argv[2];
     read_and_transform<Encode_float32_t, Encode_int16_t>(input32_t, output16_t);

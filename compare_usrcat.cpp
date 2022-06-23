@@ -203,11 +203,11 @@ array<Point3D, 4> calcRefPoints(const ROMol& mol, const vector<int>& heavyAtoms)
 int main(int argc, char* argv[])
 {
 	// Check the required number of command line arguments.
-	if (argc != 2)
-	{
-		std::cout << "./compare [QUERY]" << endl;
-		return 0;
-	}
+    if (argc != 2)
+    {
+	std::cout << "./compare [QUERY]" << endl;
+	return 0;
+    }
 
     const auto queries = argv[1];
     const size_t usr0 = 1;
@@ -216,101 +216,101 @@ int main(int argc, char* argv[])
     const size_t qnu1 = 12;
 
     // Initialize constants.
-	std::cout << local_time() << "Initializing" << endl;
-	// const auto collection = "istar.usr2";
-	const size_t num_usrs = 2;
-	const array<string, 2> usr_names{{ "USR", "USRCAT" }};
-	constexpr array<size_t, num_usrs> qn{{ 12, 60 }};
-	constexpr array<double, num_usrs> qv{{ 1.0 / qn[0], 1.0 / qn[1] }};
-	const size_t num_refPoints = 4;
-	const size_t num_subsets = 5;
-	const array<string, num_subsets> SubsetSMARTS
-	{{
-		"[!#1]", // heavy
-		"[#6+0!$(*~[#7,#8,F]),SH0+0v2,s+0,S^3,Cl+0,Br+0,I+0]", // hydrophobic
-		"[a]", // aromatic
-		"[$([O,S;H1;v2]-[!$(*=[O,N,P,S])]),$([O,S;H0;v2]),$([O,S;-]),$([N&v3;H1,H2]-[!$(*=[O,N,P,S])]),$([N;v3;H0]),$([n,o,s;+0]),F]", // acceptor
-		"[N!H0v3,N!H0+v4,OH+0,SH+0,nH+0]", // donor
-	}};
-	const size_t num_hits = 100;
+    std::cout << local_time() << "Initializing" << endl;
+    // const auto collection = "istar.usr2";
+    const size_t num_usrs = 2;
+    const array<string, 2> usr_names{{ "USR", "USRCAT" }};
+    constexpr array<size_t, num_usrs> qn{{ 12, 60 }};
+    constexpr array<double, num_usrs> qv{{ 1.0 / qn[0], 1.0 / qn[1] }};
+    const size_t num_refPoints = 4;
+    const size_t num_subsets = 5;
+    const array<string, num_subsets> SubsetSMARTS
+    {{
+    	"[!#1]", // heavy
+    	"[#6+0!$(*~[#7,#8,F]),SH0+0v2,s+0,S^3,Cl+0,Br+0,I+0]", // hydrophobic
+    	"[a]", // aromatic
+	"[$([O,S;H1;v2]-[!$(*=[O,N,P,S])]),$([O,S;H0;v2]),$([O,S;-]),$([N&v3;H1,H2]-[!$(*=[O,N,P,S])]),$([N;v3;H0]),$([n,o,s;+0]),F]", // acceptor
+	"[N!H0v3,N!H0+v4,OH+0,SH+0,nH+0]", // donor
+    }};
+    const size_t num_hits = 100;
 
-	// Wrap SMARTS strings to RWMol objects.
-	array<unique_ptr<ROMol>, num_subsets> SubsetMols;
-	for (size_t k = 0; k < num_subsets; ++k)
-	{
-		SubsetMols[k].reset(reinterpret_cast<ROMol*>(SmartsToMol(SubsetSMARTS[k])));
-	}
+    // Wrap SMARTS strings to RWMol objects.
+    array<unique_ptr<ROMol>, num_subsets> SubsetMols;
+    for (size_t k = 0; k < num_subsets; ++k)
+    {
+    	SubsetMols[k].reset(reinterpret_cast<ROMol*>(SmartsToMol(SubsetSMARTS[k])));
+    }
 
-	// Read ZINC ID file.
-	const string_array<size_t> zincids("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_id.txt");
-	const auto num_ligands = zincids.size();
-	std::cout << local_time() << "Found " << num_ligands << " database molecules" << endl;
+    // Read ZINC ID file.
+    const string_array<size_t> zincids("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_id.txt");
+    const auto num_ligands = zincids.size();
+    std::cout << local_time() << "Found " << num_ligands << " database molecules" << endl;
 
-	// Read SMILES file.
-	const string_array<size_t> smileses("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_smiles.txt");
-	assert(smileses.size() == num_ligands);
-	const auto num_smiles = smileses.size();
-	std::cout << local_time() << "Found " << num_smiles << " database smiles molecules" << endl;
+    // Read SMILES file.
+    const string_array<size_t> smileses("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_smiles.txt");
+    assert(smileses.size() == num_ligands);
+    const auto num_smiles = smileses.size();
+    std::cout << local_time() << "Found " << num_smiles << " database smiles molecules" << endl;
 
 
-	// Read property files of floating point types and integer types.
-	const auto zfproperties = read<array<float, 4>>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_4.f32");
-	assert(zfproperties.size() == num_ligands);
-	std::cout << "Number of f properties = " << zfproperties.size() << endl;
-	const auto ziproperties = read<array<int16_t, 5>>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_5.i16");
-	assert(ziproperties.size() == num_ligands);
-	std::cout << "Number of i properties = " << ziproperties.size() << endl;
+    // Read property files of floating point types and integer types.
+    const auto zfproperties = read<array<float, 4>>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_4.f32");
+    assert(zfproperties.size() == num_ligands);
+    std::cout << "Number of f properties = " << zfproperties.size() << endl;
+    const auto ziproperties = read<array<int16_t, 5>>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ_5.i16");
+    assert(ziproperties.size() == num_ligands);
+    std::cout << "Number of i properties = " << ziproperties.size() << endl;
 
-	// Read cumulative number of conformers file.
-	const auto mconfss = read<size_t>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/mconfs.f64");
-	const auto num_conformers = mconfss.back();
+    // Read cumulative number of conformers file.
+    const auto mconfss = read<size_t>("~/Documents/USR-VS/USR_FILES/final/CHUNK4/mconfs.f64");
+    const auto num_conformers = mconfss.back();
 	assert(mconfss.size() == num_ligands);
-	assert(num_conformers >= num_ligands);
-	std::cout << local_time() << "Found " << num_conformers << " database conformers" << endl;
+    assert(num_conformers >= num_ligands);
+    std::cout << local_time() << "Found " << num_conformers << " database conformers" << endl;
 
-	// Read feature file.
-	const auto features = read<array<int16_t, qn.back()>>("~/Desktop/usrcat.i16");
+    // Read feature file.
+    const auto features = read<array<int16_t, qn.back()>>("~/Desktop/usrcat.i16");
     cout << "SIZE OF FZATURES : " << features.size() << endl;
-	assert(features.size() == num_ligands * 4);
-	std::cout << local_time() << "Found " << features.size() << " usrcat features" << endl;
-	std::cout << " features size = " << features.size() << " num ligands = " << num_ligands * 4 << endl;
-	// Read ligand footer file and open ligand SDF file for seeking and reading.
-	stream_array<size_t> ligands("/home/kassa-baghdouche/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ.sdf");
-	std::cout << local_time() << "Found " << ligands.size() << " conformers!" << endl;
-	assert(ligands.size() == features.size());
-	// Initialize variables.
-	array<vector<int>, num_subsets> subsets;
-	array<vector<double>, num_refPoints> dista;
-	alignas(32) array<double, qn.back()> q;
+    assert(features.size() == num_ligands * 4);
+    std::cout << local_time() << "Found " << features.size() << " usrcat features" << endl;
+    std::cout << " features size = " << features.size() << " num ligands = " << num_ligands * 4 << endl;
+    // Read ligand footer file and open ligand SDF file for seeking and reading.
+    stream_array<size_t> ligands("/home/kassa-baghdouche/Documents/USR-VS/USR_FILES/final/CHUNK4/ligand_BJ.sdf");
+    std::cout << local_time() << "Found " << ligands.size() << " conformers!" << endl;
+    assert(ligands.size() == features.size());
+    // Initialize variables.
+    array<vector<int>, num_subsets> subsets;
+    array<vector<double>, num_refPoints> dista;
+    alignas(32) array<double, qn.back()> q;
 
-	// Initialize vectors to store compounds' primary score and their corresponding conformer.
-	vector<double> scores(num_ligands); // Primary score of molecules.
-	vector<size_t> cnfids(num_ligands); // ID of conformer with the best primary score.
-	const auto compare = [&](const size_t val0, const size_t val1) // Sort by the primary score.
-	{
-		return scores[val0] < scores[val1];
-	};
+    // Initialize vectors to store compounds' primary score and their corresponding conformer.
+    vector<double> scores(num_ligands); // Primary score of molecules.
+    vector<size_t> cnfids(num_ligands); // ID of conformer with the best primary score.
+    const auto compare = [&](const size_t val0, const size_t val1) // Sort by the primary score.
+    {
+    	return scores[val0] < scores[val1];
+    };
 
-	// Initialize an io service pool and create worker threads for later use.
-	const size_t num_threads = thread::hardware_concurrency();
-	std::cout << local_time() << "Creating an io service pool of " << num_threads << " worker threads" << endl;
-	io_service_pool io(num_threads);
-	safe_counter<size_t> cnt;
+    // Initialize an io service pool and create worker threads for later use.
+    const size_t num_threads = thread::hardware_concurrency();
+    std::cout << local_time() << "Creating an io service pool of " << num_threads << " worker threads" << endl;
+    io_service_pool io(num_threads);
+    safe_counter<size_t> cnt;
 
-	// Initialize the number of chunks and the number of molecules per chunk.
-	const auto num_chunks = num_threads << 4;
-	// const auto num_chunks = num_threads << 2;
-	const auto chunk_size = 1 + (num_ligands - 1) / num_chunks;
-	assert(chunk_size * num_chunks >= num_ligands);
-	// assert(chunk_size >= num_hits);
-	std::cout << local_time() << "Using " << num_chunks << " chunks and a chunk size of " << chunk_size << endl;
-	vector<size_t> scase(num_ligands);
-	vector<size_t> zcase(num_hits * (num_chunks - 1) + min(num_hits, num_ligands - chunk_size * (num_chunks - 1))); // The last chunk might have fewer than num_hits records.
+    // Initialize the number of chunks and the number of molecules per chunk.
+    const auto num_chunks = num_threads << 4;
+    // const auto num_chunks = num_threads << 2;
+    const auto chunk_size = 1 + (num_ligands - 1) / num_chunks;
+    assert(chunk_size * num_chunks >= num_ligands);
+    // assert(chunk_size >= num_hits);
+    std::cout << local_time() << "Using " << num_chunks << " chunks and a chunk size of " << chunk_size << endl;
+    vector<size_t> scase(num_ligands);
+    vector<size_t> zcase(num_hits * (num_chunks - 1) + min(num_hits, num_ligands - chunk_size * (num_chunks - 1))); // The last chunk might have fewer than num_hits records.
 
-	// Enter event loop.
-	std::cout << local_time() << "Entering event loop" << endl;
-	std::cout.setf(ios::fixed, ios::floatfield);
-    
+    // Enter event loop.
+    std::cout << local_time() << "Entering event loop" << endl;
+    std::cout.setf(ios::fixed, ios::floatfield);
+       
     SDMolSupplier sup(queries, true, false, true);
     unsigned int query_number = 1;
 

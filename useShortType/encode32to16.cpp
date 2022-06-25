@@ -56,41 +56,6 @@ static inline vector<T> get_buffer(const path& src) {
 	return buffer;
 }
 
-/**
- * @brief Read a USRCAT features encoded with the float, and write the features in short type (2bytes)
- * 
- * @tparam T 
- * @tparam OT 
- * @param src_file 
- * @param output_file 
- */
-template<typename T, typename OT>
-static void read_and_transform(const path& src_file, const path& output_file) {
-    boost_ifstream ifs(src_file, ios::in | ios::binary | ios::ate); // ios::ate to seek to the end of file, for getting the number of bytes
-    boost_ofstream ofs(output_file, ios::binary);
-    const size_t num_bytes = ifs.tellg();
-    cerr << "Reading file of " << num_bytes << " bytes." << endl;
-    ifs.seekg(0, ios::beg);
-    vector<T> buffer_array;
-    OT buffer_output;
-    unsigned int counter = 0;
-    // while (!ifs.eof()) {
-    cout << "Start reading" << endl;
-    ifs.read(reinterpret_cast<char*>(buffer_array.data()), num_bytes);
-    cout << "finish reading" << endl;
-    // cerr << "Processing molecule N° " << counter++ << endl;
-    for (const auto& buf : buffer_array) {
-        for (int i = 0; i < USRCAT_FEATURES; i++) {
-            buffer_output[i] = (int16_t)(buf[i] * 1000);
-        }
-        cout << buffer_output;
-        ofs.write(reinterpret_cast<char*>(buffer_output.data()), sizeof(OT));
-    }
-    // cout << buffer_array;
-    // cout << "--------------------------------\n";
-    cout << buffer_output;
-    // }
-}
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -109,7 +74,6 @@ int main(int argc, char* argv[]) {
         cout << features16_t;
         ofs.write(reinterpret_cast<char*>(features16_t.data()), sizeof(Encode_int16_t));
     }
-    // read_and_transform<Encode_float32_t, Encode_int16_t>(input32_t, output16_t);
 }
 
 

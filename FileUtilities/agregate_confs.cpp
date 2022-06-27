@@ -12,6 +12,6 @@ int main(int argc, char* argv[]) {
 		agregated_confs += 4;
 		uint64_t* address = &agregated_confs;
 		const unsigned long size_buffer = sizeof(agregated_confs);
-		std::cout.write(reinterpret_cast<char*>(address), sizeof(size_buffer));
+		std::cout.write(reinterpret_cast<char*>(address), size_buffer);
 	}
 }

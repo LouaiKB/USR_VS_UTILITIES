@@ -2,7 +2,7 @@ CC=gcc
 
 all: bin/embed
 
-bin/embed: obj/embed_multithread.o obj/io_service_pool.o obj/safe_counter.o 
+bin/embed: obj/REAL_preparation.o obj/io_service_pool.o obj/safe_counter.o 
 	${CC} -o $@ $^ -L ${RDKIT_ROOT}/lib -lRDKitMolAlign -lRDKitDistGeomHelpers -lRDKitForceFieldHelpers -lRDKitSubstructMatch -lRDKitFileParsers -lRDKitSmilesParse -lRDKitDepictor -lRDKitGraphMol -lRDKitDistGeometry -lRDKitRDGeneral -lRDKitDescriptors -L ${BOOST_ROOT}/lib -lboost_date_time -lboost_thread -lboost_system -lboost_filesystem -lpthread -lm -lstdc++ 
 
 obj/%.o: src/%.cpp

@@ -1,8 +1,8 @@
 /**
- * @file EmbedPDBQTMols.cpp
+ * @file REAL_preparation.cpp
  * @author Louai KASSA BAGHDOUCHE
- * @brief A C++ code to generate conformers from multiple pdbqt files, by fetching the SMILES and ID from PDBQT and generate SMI files, with multithreading
- * @date 2022-03-29
+ * @brief A C++ code to generate conformers from multiple pdbqt files, by fetching the SMILES and ID from PDBQT and generate multiple filesystems, with multithreading
+ * @date 2022-06-11
  * 
  * @copyright Copyright (c) 2022
  * 
